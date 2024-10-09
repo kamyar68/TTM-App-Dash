@@ -1,24 +1,33 @@
-# Paths to database and data files
+import geopandas as gpd
+import pandas as pd
+import plotly.graph_objects as go
+from dash import dcc, html, Input, Output, State
+import dash_bootstrap_components as dbc
+from app import app  # Import the app instance from app.py
+import sqlite3
+import os
+
+# Path to database and other data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
 
-# Load the grid data
+# Load the grid geodataframe
 grid_gdf = gpd.read_file(gridfile)
 
-# Convert to EPSG:3067 and then to EPSG:4326 for mapping, if necessary
+# Ensure the CRS is set to EPSG:3067 and project to WGS84 (EPSG:4326) for mapping
 if grid_gdf.crs is None or grid_gdf.crs != 'EPSG:3067':
     grid_gdf = grid_gdf.to_crs('EPSG:3067')
 grid_gdf = grid_gdf[grid_gdf.is_valid]
 grid_gdf = grid_gdf.to_crs(epsg=4326)
 
-# Pre-calculate coordinates for centroids and map center
+# Pre-calculate centroid coordinates and the center of the map
 latitudes = grid_gdf.geometry.centroid.y
 longitudes = grid_gdf.geometry.centroid.x
 center_lat = latitudes.mean()
 center_lon = longitudes.mean()
 
-# Short descriptions for each travel mode
+# Define the columns and short descriptions
 column_descriptions = {
     'walk_avg': 'Walking (average speed)',
     'walk_slo': 'Walking (slow speed)',
@@ -36,7 +45,7 @@ column_descriptions = {
     'car_n': 'Car (night)'
 }
 
-# Query the database based on column and threshold
+# Function to query the database based on column and threshold
 def query_db(column, threshold, clicked_id):
     conn = sqlite3.connect(db_path)
     query = f"""
@@ -47,11 +56,11 @@ def query_db(column, threshold, clicked_id):
     conn.close()
     return related_ids
 
-# Function to create the map with highlighted cells
+# Function to create the scatter map
 def create_map(selected_ids=[], zoom=9.5, center=None):
     fig = go.Figure()
 
-    # Plot for all grid cells
+    # Base scatter plot for all grid cells
     fig.add_trace(
         go.Scattermapbox(
             lat=latitudes,
@@ -64,7 +73,7 @@ def create_map(selected_ids=[], zoom=9.5, center=None):
         )
     )
 
-    # Highlight selected cells in red
+    # Highlight selected cells
     if selected_ids:
         selected_gdf = grid_gdf[grid_gdf['id'].isin(selected_ids)]
         fig.add_trace(
@@ -94,7 +103,7 @@ def create_map(selected_ids=[], zoom=9.5, center=None):
 
     return fig
 
-# Define the layout with sidebar on the left and map on the right
+# Define layout for this page with a vertical box on the left and map on the right
 scatterplot_layout = html.Div([
     html.Div(id='floating-box', children=[
         html.H4("Travel Time Matrix"),
@@ -108,7 +117,7 @@ scatterplot_layout = html.Div([
         html.Button('Search', id='cell-id-search', n_clicks=0),
         html.Br(), html.Br(),
 
-        # Dropdown for travel mode selection
+        # Dropdown for dataset selection with short descriptions
         html.Hr(),
         html.H5("Travel Mode"),
         dcc.Dropdown(
@@ -118,7 +127,7 @@ scatterplot_layout = html.Div([
             clearable=False
         ),
         html.Br(),
-        # Slider for setting threshold
+        # Slider for threshold selection
         html.H5("Threshold (minutes)"),
         dcc.Slider(
             id='threshold-slider',
@@ -129,7 +138,7 @@ scatterplot_layout = html.Div([
             marks={i: str(i) for i in range(5, 121, 15)}
         ),
 
-        # Display for current slider value
+        # Div to display the current slider value
         html.Div(id='slider-value', style={'margin-top': '10px', 'font-size': '16px'}),
 
         html.Br(),

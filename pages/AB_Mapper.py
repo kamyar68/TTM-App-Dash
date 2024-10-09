@@ -1,3 +1,10 @@
+import geopandas as gpd
+import sqlite3
+import plotly.graph_objects as go
+from dash import dcc, html, Input, Output, State
+import dash_bootstrap_components as dbc
+from app import app  # Make sure you import the app instance from app.py
+
 # Path to data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
@@ -5,22 +12,22 @@ gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 # Load the grid data
 grid_gdf = gpd.read_file(gridfile)
 
-# Convert to EPSG:4326 if it's not already set
+# Ensure the CRS is set to EPSG:4326 for mapping
 if grid_gdf.crs is None or grid_gdf.crs != 'EPSG:4326':
     grid_gdf = grid_gdf.to_crs('EPSG:4326')
 
 grid_gdf = grid_gdf[grid_gdf.is_valid]
 
-# Calculate map center and cell centroids
+# Calculate the map center and cell centroid coordinates once
 center_lat = grid_gdf.geometry.centroid.y.mean()
 center_lon = grid_gdf.geometry.centroid.x.mean()
 latitudes = grid_gdf.geometry.centroid.y
 longitudes = grid_gdf.geometry.centroid.x
 
-# Store the current pair being queried (resets after the third click)
+# Global variable to store the current queried pair (reset after third click)
 current_queries = []
 
-# Create the map with highlighted cells based on selection and queries
+# Create the base map figure with an option to highlight selected and queried grid cells
 def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
     fig = go.Figure()
 
@@ -37,7 +44,7 @@ def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
         )
     )
 
-    # Highlight selected grid cells in red
+    # Highlight the currently selected grid cells (in red)
     if selected_ids:
         selected_gdf = grid_gdf[grid_gdf['id'].isin(selected_ids)]
         fig.add_trace(
@@ -51,7 +58,7 @@ def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
             )
         )
 
-    # Highlight queried grid cells in orange
+    # Highlight the currently queried pair (in green)
     if queried_ids:
         queried_gdf = grid_gdf[grid_gdf['id'].isin(queried_ids)]
         fig.add_trace(
@@ -78,7 +85,7 @@ def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
 
     return fig
 
-# Layout setup with a sidebar for queries and map on the right
+# Define layout for this page with a vertical box on the left and map on the right
 toast_map_layout = html.Div([
     html.Div(id='floating-box', children=[
         html.H4("A-B Query"),
@@ -110,13 +117,13 @@ toast_map_layout = html.Div([
     ], style={'display': 'inline-block', 'width': 'calc(100% - 300px)', 'height': '100vh'})
 ], style={'display': 'flex', 'flexDirection': 'row', 'height': '100vh'})
 
-# Define the query function
+# Define the query_db function
 def query_db(from_id, to_id):
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Query travel times and distances from the database
+        # Query the database for the travel time details including walk_d
         query = """
             SELECT walk_d, walk_avg, walk_slo, bike_avg, bike_fst, bike_slo, 
                    pt_r_avg, pt_r_slo, pt_m_avg, pt_m_slo, 
@@ -161,7 +168,7 @@ def query_db(from_id, to_id):
     except Exception as e:
         return None
 
-# Callback to update map and cell selection
+# Callback for updating the map and selecting cells
 @app.callback(
     [Output('toast-map', 'figure'),
      Output('query-result', 'children')],
