@@ -228,3 +228,9 @@ To make sure the Dash app automatically restarts if it crashes, you can set it u
   ```
 
 This setup will allow your Dash app to automatically restart if it crashes, helping to maintain uptime without manual intervention.
+
+**Remember to restart the app after changes/git pull**
+
+```
+sudo systemctl restart dash_app.service
+```
