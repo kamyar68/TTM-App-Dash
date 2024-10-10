@@ -66,7 +66,7 @@ def create_map(selected_ids=[], zoom=9.5, center=None):
             lat=latitudes,
             lon=longitudes,
             mode='markers',
-            marker=dict(size=22, color='blue', opacity=0.06),
+            marker=dict(size=22, color='blue', opacity=0.2),
             hoverinfo='text',
             hovertext=grid_gdf['id'],
             name='All Cells'
@@ -81,7 +81,7 @@ def create_map(selected_ids=[], zoom=9.5, center=None):
                 lat=selected_gdf.geometry.centroid.y,
                 lon=selected_gdf.geometry.centroid.x,
                 mode='markers',
-                marker=dict(size=22, color='red', opacity=0.15),
+                marker=dict(size=22, color='red', opacity=0.3),
                 hoverinfo='text',
                 hovertext=selected_gdf['id'],
                 name='Selected Cells'
