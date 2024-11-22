@@ -62,7 +62,7 @@ def query_db(column, threshold, clicked_id):
     return related_ids
 
 # Function to create the scatter map
-def create_map(selected_ids=[], zoom=9.5, center=None):
+def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
     fig = go.Figure()
 
     # Base scatter plot for all grid cells
@@ -78,18 +78,33 @@ def create_map(selected_ids=[], zoom=9.5, center=None):
         )
     )
 
-    # Highlight selected cells
+    # Highlight reachable cells
     if selected_ids:
-        selected_gdf = grid_gdf[grid_gdf['id'].isin(selected_ids)]
+        highlighted_gdf = grid_gdf[grid_gdf['id'].isin(selected_ids) & (grid_gdf['id'] != activated_id)]
         fig.add_trace(
             go.Scattermapbox(
-                lat=selected_gdf.geometry.centroid.y,
-                lon=selected_gdf.geometry.centroid.x,
+                lat=highlighted_gdf.geometry.centroid.y,
+                lon=highlighted_gdf.geometry.centroid.x,
                 mode='markers',
                 marker=dict(size=22, color='red', opacity=0.3),
                 hoverinfo='text',
-                hovertext=selected_gdf['id'],
-                name='Selected Cells'
+                hovertext=highlighted_gdf['id'],
+                name='Highlighted Cells'
+            )
+        )
+
+    # Highlight the activated cell
+    if activated_id:
+        activated_gdf = grid_gdf[grid_gdf['id'] == activated_id]
+        fig.add_trace(
+            go.Scattermapbox(
+                lat=activated_gdf.geometry.centroid.y,
+                lon=activated_gdf.geometry.centroid.x,
+                mode='markers',
+                marker=dict(size=22, color='green', opacity=0.8),  # Same size as others
+                hoverinfo='text',
+                hovertext=activated_gdf['id'],
+                name='Activated Cell'
             )
         )
 
@@ -240,7 +255,7 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
     related_ids = query_db(dataset_value, threshold, clicked_id)
     center = {'lat': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.y.values[0],
               'lon': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.x.values[0]}
-    new_fig = create_map(selected_ids=related_ids + [clicked_id], zoom=zoom, center=center)
+    new_fig = create_map(selected_ids=related_ids, activated_id=clicked_id, zoom=zoom, center=center)
 
     filename = f'Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
     file_path = os.path.normpath(os.path.join(csv_folder, filename))
