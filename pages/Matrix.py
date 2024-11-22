@@ -2,17 +2,22 @@ import geopandas as gpd
 import pandas as pd
 import plotly.graph_objects as go
 from dash import dcc, html, Input, Output, State
-import dash_bootstrap_components as dbc
 from app import app  # Import the app instance from app.py
 import sqlite3
 import os
 from geopy.geocoders import Nominatim
 from shapely.geometry import Point
+from datetime import datetime, timedelta
+from pathlib import Path
 
 # Path to database and other data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
+download_folder = 'download_files'  # Folder for download files
+
+# Ensure the download folder exists
+Path(download_folder).mkdir(parents=True, exist_ok=True)
 
 # Initialize geolocator
 geolocator = Nominatim(user_agent="Helsinki_TTM_App")
@@ -50,6 +55,7 @@ column_descriptions = {
     'car_n': 'Car (night)'
 }
 
+
 # Function to query the database based on column and threshold
 def query_db(column, threshold, clicked_id):
     conn = sqlite3.connect(db_path)
@@ -60,6 +66,70 @@ def query_db(column, threshold, clicked_id):
     related_ids = pd.read_sql(query, conn, params=(threshold, clicked_id))['to_id'].tolist()
     conn.close()
     return related_ids
+
+
+# Function to create the GeoPackage of highlighted cells
+def create_gpkg(clicked_id, related_ids, dataset_value):
+    # Filter the grid GeoDataFrame to only include the related IDs
+    highlighted_gdf = grid_gdf[grid_gdf['id'].isin(related_ids)]
+    print(highlighted_gdf.head())
+
+    if highlighted_gdf.empty:
+        print("Error: No matching rows found in grid_gdf for related_ids.")
+        return None  # Skip creating an empty file
+
+
+    travel_time_df = pd.read_csv(f"data/Helsinki_Travel_Time_Matrix_2023/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv")
+    print(travel_time_df.head())
+
+
+    if travel_time_df.empty:
+        print("Error: No travel time data found for clicked_id.")
+        return None
+
+    # Ensure columns align for the merge
+    if 'id' not in highlighted_gdf.columns:
+        print("Error: 'id' column not found in grid_gdf.")
+        return None
+    if 'to_id' not in travel_time_df.columns:
+        print("Error: 'to_id' column not found in travel_time_df.")
+        return None
+
+    # Merge the travel time data with the GeoDataFrame
+    highlighted_gdf = highlighted_gdf.merge(travel_time_df, left_on='id', right_on='from_id')
+
+    if highlighted_gdf.empty:
+        print("Error: Merge resulted in an empty GeoDataFrame.")
+        return None
+
+    # Validate geometries
+    if not highlighted_gdf.is_valid.all():
+        print("Error: Invalid geometries detected. Cleaning geometries.")
+        highlighted_gdf = highlighted_gdf[highlighted_gdf.is_valid]
+
+    # Define the output file path
+    gpkg_filename = f'{download_folder}/highlighted_cells_{clicked_id}.gpkg'
+
+    # Save the GeoDataFrame to a GeoPackage
+    try:
+        highlighted_gdf.to_file(gpkg_filename, driver="GPKG")
+    except Exception as e:
+        print(f"Error saving GeoPackage: {e}")
+        return None
+
+    print(f"GeoPackage successfully created: {gpkg_filename}")
+    return gpkg_filename
+
+
+# Function to delete files older than 7 days
+def delete_old_files(folder, days=7):
+    now = datetime.now()
+    cutoff = now - timedelta(days=days)
+
+    for file in Path(folder).glob('*'):
+        if file.is_file() and datetime.fromtimestamp(file.stat().st_mtime) < cutoff:
+            file.unlink()
+
 
 # Function to create the scatter map
 def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
@@ -122,6 +192,7 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
     )
 
     return fig
+
 
 # Define layout for this page with a vertical box on the left and map on the right
 scatterplot_layout = html.Div([
@@ -198,7 +269,8 @@ scatterplot_layout = html.Div([
     ], style={'display': 'inline-block', 'width': 'calc(100% - 300px)', 'height': '100vh'})
 ], style={'display': 'flex', 'flexDirection': 'row', 'height': '100vh'})
 
-# Callback for updating the map and selecting cells
+
+# Updated callback
 @app.callback(
     [Output('scatterplot-map', 'figure'),
      Output('floating-box-content', 'children'),
@@ -214,7 +286,8 @@ scatterplot_layout = html.Div([
      State('cell-id-input', 'value'),
      State('address-input', 'value')]
 )
-def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr, n_submit, relayout_data, cell_id, address):
+def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr, n_submit, relayout_data, cell_id,
+               address):
     zoom = 9.5
     center = None
     error_msg = ""
@@ -249,29 +322,41 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         try:
             clicked_id = int(click_data['points'][0]['hovertext'])
         except (KeyError, ValueError):
-            return create_map(zoom=zoom, center=center), "Invalid click - no grid cell ID detected.", f"Threshold: {threshold} min", error_msg
+            return create_map(zoom=zoom,
+                              center=center), "Invalid click - no grid cell ID detected.", f"Threshold: {threshold} min", error_msg
     else:
-        return create_map(zoom=zoom, center=center), "Click on a grid cell or type in the cell id below to map how far you can reach.", f"Threshold: {threshold} min", error_msg
+        return create_map(zoom=zoom,
+                          center=center), "Click on a grid cell or type in the cell id below to map how far you can reach.", f"Threshold: {threshold} min", error_msg
 
+    # Delete old files from the download folder
+    delete_old_files(download_folder)
+
+    # Query database for related IDs
     related_ids = query_db(dataset_value, threshold, clicked_id)
     center = {'lat': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.y.values[0],
               'lon': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.x.values[0]}
     new_fig = create_map(selected_ids=related_ids, activated_id=clicked_id, zoom=zoom, center=center)
 
-    filename = f'Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
-    file_path = os.path.normpath(os.path.join(csv_folder, filename))
+    # Create GeoPackage file
+    gpkg_filepath = create_gpkg(clicked_id, related_ids, dataset_value)
+    gpkg_filename = os.path.basename(gpkg_filepath)
+
+    # CSV download logic
+    csv_filename = f'{download_folder}/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
     area_km2 = round(len(related_ids) * 62500 / 1000000, 2)
-    if os.path.exists(file_path):
-        floating_box_content = html.Div([
-            f"Clicked Cell ID: {clicked_id}",
-            html.Br(), html.Br(),
-            html.B(f"{len(related_ids)}"),
-            f" cells can be reached within {threshold} minutes using '{dataset_value}'. This is equivalent to an approximate area of ",
-            html.B(f"{area_km2} km²."),
-            html.Br(), html.Br(),
-            html.A("Download CSV", href=f'/download/{filename}', download=filename)
-        ])
-    else:
-        floating_box_content = f"Clicked Cell ID: {clicked_id}, Reachable Cells: {related_ids}. No CSV available."
+
+    # Generate floating box content
+    floating_box_content = html.Div([
+        f"Clicked Cell ID: {clicked_id}",
+        html.Br(), html.Br(),
+        html.B(f"{len(related_ids)}"),
+        f" cells can be reached within {threshold} minutes using '{dataset_value}'. This is equivalent to an approximate area of ",
+        html.B(f"{area_km2} km²."),
+        html.Br(), html.Br(),
+        html.A("Download CSV", href=f'/{csv_filename}',
+               download=f'Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'),
+        html.Br(), html.Br(),
+        html.A("Download GPKG", href=f'/{gpkg_filename}', download=gpkg_filename)
+    ])
 
     return new_fig, floating_box_content, f"Threshold: {threshold} min", error_msg
