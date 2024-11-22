@@ -6,11 +6,15 @@ import dash_bootstrap_components as dbc
 from app import app  # Import the app instance from app.py
 import sqlite3
 import os
+from geopy.geocoders import Nominatim
 
 # Path to database and other data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
+
+# Initialize geolocator
+geolocator = Nominatim(user_agent="Helsinki_TTM_App")
 
 # Load the grid geodataframe
 grid_gdf = gpd.read_file(gridfile)
@@ -117,6 +121,13 @@ scatterplot_layout = html.Div([
         html.Button('Search', id='cell-id-search', n_clicks=0),
         html.Br(), html.Br(),
 
+        # Address search
+        html.H5("Search by Address"),
+        dcc.Input(id='address-input', type='text', placeholder='Enter address'),
+        html.Button('Search Address', id='address-search-btn', n_clicks=0),
+        html.Div(id='address-error', style={'color': 'red', 'marginTop': '10px'}),
+        html.Br(), html.Br(),
+
         # Dropdown for dataset selection with short descriptions
         html.Hr(),
         html.H5("Travel Mode"),
@@ -175,31 +186,46 @@ scatterplot_layout = html.Div([
 @app.callback(
     [Output('scatterplot-map', 'figure'),
      Output('floating-box-content', 'children'),
-     Output('slider-value', 'children')],
+     Output('slider-value', 'children'),
+     Output('address-error', 'children')],
     [Input('scatterplot-map', 'clickData'),
      Input('dataset-selector', 'value'),
      Input('threshold-slider', 'value'),
-     Input('cell-id-search', 'n_clicks')],
+     Input('cell-id-search', 'n_clicks'),
+     Input('address-search-btn', 'n_clicks')],
     [State('scatterplot-map', 'relayoutData'),
-     State('cell-id-input', 'value')]
+     State('cell-id-input', 'value'),
+     State('address-input', 'value')]
 )
-def update_map(click_data, dataset_value, threshold, n_clicks, relayout_data, cell_id):
+def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr, relayout_data, cell_id, address):
     zoom = 9.5
     center = None
+    error_msg = ""
 
     if relayout_data:
         zoom = relayout_data.get('mapbox.zoom', 9.5)
         center = relayout_data.get('mapbox.center', None)
 
-    if n_clicks > 0 and cell_id is not None:
+    if n_clicks_addr > 0 and address:
+        try:
+            location = geolocator.geocode(address)
+            if location:
+                center = {'lat': location.latitude, 'lon': location.longitude}
+                return create_map(zoom=15, center=center), "Map centered to address.", f"Threshold: {threshold} min", ""
+            else:
+                error_msg = "Address not found. Try a different query."
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+
+    if n_clicks_id > 0 and cell_id is not None:
         clicked_id = cell_id
     elif click_data:
         try:
             clicked_id = int(click_data['points'][0]['hovertext'])
         except (KeyError, ValueError):
-            return create_map(zoom=zoom, center=center), "Invalid click - no grid cell ID detected.", f"Threshold: {threshold} min"
+            return create_map(zoom=zoom, center=center), "Invalid click - no grid cell ID detected.", f"Threshold: {threshold} min", error_msg
     else:
-        return create_map(zoom=zoom, center=center), "Click on a grid cell or type in the cell id below to map how far you can reach.", f"Threshold: {threshold} min"
+        return create_map(zoom=zoom, center=center), "Click on a grid cell or type in the cell id below to map how far you can reach.", f"Threshold: {threshold} min", error_msg
 
     related_ids = query_db(dataset_value, threshold, clicked_id)
     new_fig = create_map(selected_ids=related_ids + [clicked_id], zoom=zoom, center=center)
@@ -220,4 +246,4 @@ def update_map(click_data, dataset_value, threshold, n_clicks, relayout_data, ce
     else:
         floating_box_content = f"Clicked Cell ID: {clicked_id}, Reachable Cells: {related_ids}. No CSV available."
 
-    return new_fig, floating_box_content, f"Threshold: {threshold} min"
+    return new_fig, floating_box_content, f"Threshold: {threshold} min", error_msg
