@@ -101,7 +101,7 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
                 lat=activated_gdf.geometry.centroid.y,
                 lon=activated_gdf.geometry.centroid.x,
                 mode='markers',
-                marker=dict(size=22, color='green', opacity=0.8),  # Same size as others
+                marker=dict(size=22, color='green', opacity=0.8),
                 hoverinfo='text',
                 hovertext=activated_gdf['id'],
                 name='Activated Cell'
@@ -139,7 +139,7 @@ scatterplot_layout = html.Div([
 
         # Address search
         html.H5("Search by Address"),
-        dcc.Input(id='address-input', type='text', placeholder='Enter address'),
+        dcc.Input(id='address-input', type='text', placeholder='Enter address', n_submit=0),
         html.Button('Search Address', id='address-search-btn', n_clicks=0),
         html.Div(id='address-error', style={'color': 'red', 'marginTop': '10px'}),
         html.Br(), html.Br(),
@@ -208,12 +208,13 @@ scatterplot_layout = html.Div([
      Input('dataset-selector', 'value'),
      Input('threshold-slider', 'value'),
      Input('cell-id-search', 'n_clicks'),
-     Input('address-search-btn', 'n_clicks')],
+     Input('address-search-btn', 'n_clicks'),
+     Input('address-input', 'n_submit')],
     [State('scatterplot-map', 'relayoutData'),
      State('cell-id-input', 'value'),
      State('address-input', 'value')]
 )
-def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr, relayout_data, cell_id, address):
+def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr, n_submit, relayout_data, cell_id, address):
     zoom = 9.5
     center = None
     error_msg = ""
@@ -222,8 +223,8 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         zoom = relayout_data.get('mapbox.zoom', 9.5)
         center = relayout_data.get('mapbox.center', None)
 
-    # Handle address search
-    if n_clicks_addr > 0 and address:
+    # Handle address search (button click or Enter key press)
+    if (n_clicks_addr > 0 or n_submit > 0) and address:
         try:
             location = geolocator.geocode(address)
             if location:
