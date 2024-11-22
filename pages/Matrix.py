@@ -7,6 +7,7 @@ from app import app  # Import the app instance from app.py
 import sqlite3
 import os
 from geopy.geocoders import Nominatim
+from shapely.geometry import Point
 
 # Path to database and other data files
 db_path = 'data/full_csvs.db'
@@ -206,17 +207,26 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         zoom = relayout_data.get('mapbox.zoom', 9.5)
         center = relayout_data.get('mapbox.center', None)
 
+    # Handle address search
     if n_clicks_addr > 0 and address:
         try:
             location = geolocator.geocode(address)
             if location:
-                center = {'lat': location.latitude, 'lon': location.longitude}
-                return create_map(zoom=15, center=center), "Map centered to address.", f"Threshold: {threshold} min", ""
+                address_point = gpd.GeoSeries([Point(location.longitude, location.latitude)], crs="EPSG:4326")
+                address_point_projected = address_point.to_crs(grid_gdf.crs)
+                containing_grid = grid_gdf[grid_gdf.geometry.contains(address_point_projected.iloc[0])]
+
+                if not containing_grid.empty:
+                    clicked_id = containing_grid.iloc[0]['id']
+                    click_data = {'points': [{'hovertext': clicked_id}]}
+                else:
+                    error_msg = "Address does not fall within any grid cell."
             else:
                 error_msg = "Address not found. Try a different query."
         except Exception as e:
             error_msg = f"Error: {str(e)}"
 
+    # Handle cell ID search or simulated click
     if n_clicks_id > 0 and cell_id is not None:
         clicked_id = cell_id
     elif click_data:
@@ -228,6 +238,8 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         return create_map(zoom=zoom, center=center), "Click on a grid cell or type in the cell id below to map how far you can reach.", f"Threshold: {threshold} min", error_msg
 
     related_ids = query_db(dataset_value, threshold, clicked_id)
+    center = {'lat': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.y.values[0],
+              'lon': grid_gdf.loc[grid_gdf['id'] == clicked_id].geometry.centroid.x.values[0]}
     new_fig = create_map(selected_ids=related_ids + [clicked_id], zoom=zoom, center=center)
 
     filename = f'Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
