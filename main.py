@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 # Import the independent app layouts
 from pages.Matrix import scatterplot_layout
 from pages.AB_Mapper import toast_map_layout
+from pages.compare import compare_layout  # Import the new compare page layout
 
 # Define the main layout with URL-based navigation
 app.layout = dbc.Container([
@@ -22,6 +23,8 @@ def display_page(pathname):
         return scatterplot_layout
     elif pathname == '/AB_map':
         return toast_map_layout
+    elif pathname == '/compare':
+        return compare_layout  # Add the new page
     else:
         # Return the custom home page layout
         return html.Div([
@@ -58,7 +61,7 @@ def display_page(pathname):
                         html.Div(
                             [
                                 html.Img(src="/assets/image3.jpg", style={"width": "100%"}),
-                                html.A("More Info", href="#",
+                                html.A("Go to Compare Page", href="/compare",
                                        style={"display": "block", "textAlign": "center", "marginTop": "10px"})
                             ]
                         ),
