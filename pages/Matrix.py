@@ -90,9 +90,14 @@ def query_db(column, threshold, clicked_id):
         SELECT to_id FROM full_DB 
         WHERE {column} <= ? AND from_id = ?
     """
-    related_ids = pd.read_sql(query, db_connection, params=(threshold, clicked_id))['to_id'].tolist()
+    # Use sqlite3 cursor for querying directly
+    cursor = db_connection.cursor()
+    cursor.execute(query, (threshold, clicked_id))
+    # Fetch all results and convert them into a list
+    related_ids = [row[0] for row in cursor.fetchall()]
     debug_timing("Queried database", start_time)
     return related_ids
+
 
 # Function to calculate the total population in highlighted cells
 def calculate_population(related_ids):
