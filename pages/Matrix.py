@@ -25,6 +25,13 @@ population_csv = 'data/pop.csv'  # Population data file
 
 db_connection = sqlite3.connect(db_path, check_same_thread=False)
 
+print("[DEBUG] Loading database into in-memory SQLite...")
+start_time = time.time()
+mem_conn = sqlite3.connect(':memory:')
+db_connection.backup(mem_conn)
+print(f"[DEBUG] Database loaded into memory in {time.time() - start_time:.2f} seconds")
+
+
 # Ensure the download folder exists
 Path(download_folder).mkdir(parents=True, exist_ok=True)
 
@@ -91,7 +98,7 @@ def query_db(column, threshold, clicked_id):
         WHERE {column} <= ? AND from_id = ?
     """
     # Use sqlite3 cursor for querying directly
-    cursor = db_connection.cursor()
+    cursor = mem_conn.cursor()
     cursor.execute(query, (threshold, clicked_id))
     # Fetch all results and convert them into a list
     related_ids = [row[0] for row in cursor.fetchall()]
