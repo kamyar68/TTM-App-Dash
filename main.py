@@ -2,11 +2,36 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 from app import app  # Import the Dash instance from app.py
 import dash_bootstrap_components as dbc
-
+from flask import send_from_directory
 # Import the independent app layouts
-from pages.Matrix import scatterplot_layout
+from pages.Matrix import scatterplot_layout, download_folder, csv_folder
 from pages.AB_Mapper import toast_map_layout
 from pages.compare import compare_layout  # Import the new compare page layout
+
+
+
+# Serve files from the 'download_folder'
+@app.server.route('/download/<filename>')
+def serve_file(filename):
+    try:
+        # Determine the folder based on the file extension
+        if filename.endswith(".csv"):
+            folder = csv_folder  # Path to your CSV files
+        else:
+            folder = download_folder  # Path to your GPKG files
+
+        print(f"[DEBUG] Serving file: {filename} from {folder}")
+        return send_from_directory(directory=folder, path=filename, as_attachment=True)
+    except FileNotFoundError:
+        print(f"[ERROR] File not found: {filename}")
+        return f"Error: {filename} not found.", 404
+    except Exception as e:
+        print(f"[ERROR] Unexpected error: {e}")
+        return f"Error: Unable to serve file {filename}.", 500
+
+
+
+
 
 # Define the main layout with URL-based navigation
 app.layout = dbc.Container([
