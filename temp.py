@@ -11,12 +11,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import time  # For debugging execution time
 
+
+
 # Path to database and other data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
 download_folder = 'download_files'  # Folder for download files
 population_csv = 'data/pop.csv'  # Population data file
+
+
+db_connection = sqlite3.connect(db_path, check_same_thread=False)
 
 # Ensure the download folder exists
 Path(download_folder).mkdir(parents=True, exist_ok=True)
@@ -65,13 +70,14 @@ print(f"[DEBUG] Population data loaded in {time.time() - start_time:.2f} seconds
 
 # Function to query the database based on column and threshold
 def query_db(column, threshold, clicked_id):
-    conn = sqlite3.connect(db_path)
+    print("[DEBUG] Querying database...")
+    start_time = time.time()
     query = f"""
         SELECT to_id FROM full_DB 
         WHERE {column} <= ? AND from_id = ?
     """
-    related_ids = pd.read_sql(query, conn, params=(threshold, clicked_id))['to_id'].tolist()
-    conn.close()
+    related_ids = pd.read_sql(query, db_connection, params=(threshold, clicked_id))['to_id'].tolist()
+    print(f"[DEBUG] Database query completed in {time.time() - start_time:.2f} seconds")
     return related_ids
 
 # Function to calculate the total population in highlighted cells
@@ -109,7 +115,7 @@ def create_gpkg(clicked_id, related_ids, dataset_value):
     if 'id' not in highlighted_gdf.columns:
         print("Error: 'id' column not found in grid_gdf.")
         return None
-    if 'to_id' not in travel_time_df.columns:
+    if 'from_id' not in travel_time_df.columns:
         print("Error: 'to_id' column not found in travel_time_df.")
         return None
 
@@ -131,6 +137,8 @@ def create_gpkg(clicked_id, related_ids, dataset_value):
     # Save the GeoDataFrame to a GeoPackage
     try:
         highlighted_gdf.to_file(gpkg_filename, driver="GPKG")
+        print("this gdf is exported")
+        print(highlighted_gdf)
     except Exception as e:
         print(f"Error saving GeoPackage: {e}")
         return None
@@ -145,6 +153,10 @@ def delete_old_files(folder, days=7):
     cutoff = now - timedelta(days=days)
 
     for file in Path(folder).glob('*'):
+        # Skip deletion for specific file
+        if file.name == "Helsinki_Travel_Time_Matrix_2023_grid.gpkg":
+            continue
+
         if file.is_file() and datetime.fromtimestamp(file.stat().st_mtime) < cutoff:
             file.unlink()
 
@@ -357,7 +369,7 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
     # Create GeoPackage file
     gpkg_filepath = create_gpkg(clicked_id, related_ids, dataset_value)
     gpkg_filename = os.path.basename(gpkg_filepath)
-
+    print(f"gpkg filename:{gpkg_filename}")
     # CSV download logic
     csv_filename = f'{download_folder}/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
     area_km2 = round(len(related_ids) * 62500 / 1000000, 2)
@@ -370,10 +382,9 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         f" cells can be reached within {threshold} minutes using '{dataset_value}'. This is equivalent to an approximate area of ",
         html.B(f"{area_km2} km²."),
         html.Br(), html.Br(),
-        html.A("Download CSV", href=f'/{csv_filename}',
-               download=f'Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'),
+        html.A("Download CSV", href=f'/download/{os.path.basename(csv_filename)}', target="_blank"),
         html.Br(), html.Br(),
-        html.A("Download GPKG", href=f'/{gpkg_filename}', download=gpkg_filename)
+        html.A("Download GPKG", href=f'/download/{os.path.basename(gpkg_filename)}', target="_blank")
     ])
 
     return new_fig, floating_box_content, f"Threshold: {threshold} min", error_msg
