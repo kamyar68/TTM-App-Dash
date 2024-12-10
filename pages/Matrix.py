@@ -24,7 +24,6 @@ download_folder = 'download_files'  # Folder for download files
 population_csv = 'data/pop.csv'  # Population data file
 
 db_connection = sqlite3.connect(db_path, check_same_thread=False)
-
 # Ensure the download folder exists
 Path(download_folder).mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +86,7 @@ def query_db(column, threshold, clicked_id):
     print("[DEBUG] Querying database...")
     start_time = time.time()
     query = f"""
-        SELECT to_id FROM full_DB 
+        SELECT to_id FROM FULL_CV 
         WHERE {column} <= ? AND from_id = ?
     """
     # Use sqlite3 cursor for querying directly
@@ -96,6 +95,9 @@ def query_db(column, threshold, clicked_id):
     # Fetch all results and convert them into a list
     related_ids = [row[0] for row in cursor.fetchall()]
     debug_timing("Queried database", start_time)
+    cursor.execute(f"EXPLAIN QUERY PLAN {query}", (threshold, clicked_id))
+    print(cursor.fetchall())
+
     return related_ids
 
 
