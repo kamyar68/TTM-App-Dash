@@ -383,7 +383,8 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
     # CSV download logic
     csv_filename = f'{download_folder}/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv'
     area_km2 = round(len(related_ids) * 62500 / 1000000, 2)
-
+    # Calculate total population in reachable area
+    total_population = calculate_population(related_ids)
     # Generate floating box content
     floating_box_content = html.Div([
         f"Clicked Cell ID: {clicked_id}",
@@ -391,6 +392,9 @@ def update_map(click_data, dataset_value, threshold, n_clicks_id, n_clicks_addr,
         html.B(f"{len(related_ids)}"),
         f" cells can be reached within {threshold} minutes using '{dataset_value}'. This is equivalent to an approximate area of ",
         html.B(f"{area_km2} km²."),
+        html.Br(), html.Br(),
+        html.B(f"Population: {total_population}"),
+        " people live in the reachable area.",
         html.Br(), html.Br(),
         html.A("Download CSV", href=f'/download/{os.path.basename(csv_filename)}', target="_blank"),
         html.Br(), html.Br(),

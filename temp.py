@@ -11,7 +11,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import time  # For debugging execution time
 
-
+# Debugging helper function
+def debug_timing(message, start_time):
+    elapsed_time = time.time() - start_time
+    print(f"[DEBUG] {message}: {elapsed_time:.2f} seconds")
 
 # Path to database and other data files
 db_path = 'data/full_csvs.db'
@@ -20,9 +23,7 @@ csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
 download_folder = 'download_files'  # Folder for download files
 population_csv = 'data/pop.csv'  # Population data file
 
-
 db_connection = sqlite3.connect(db_path, check_same_thread=False)
-
 # Ensure the download folder exists
 Path(download_folder).mkdir(parents=True, exist_ok=True)
 
@@ -30,19 +31,31 @@ Path(download_folder).mkdir(parents=True, exist_ok=True)
 geolocator = Nominatim(user_agent="Helsinki_TTM_App")
 
 # Load the grid geodataframe
+print("[DEBUG] Loading grid geodataframe...")
+start_time = time.time()
 grid_gdf = gpd.read_file(gridfile)
+debug_timing("Loaded grid geodataframe", start_time)
 
 # Ensure the CRS is set to EPSG:3067 and project to WGS84 (EPSG:4326) for mapping
 if grid_gdf.crs is None or grid_gdf.crs != 'EPSG:3067':
+    print("[DEBUG] Reprojecting grid CRS...")
+    start_time = time.time()
     grid_gdf = grid_gdf.to_crs('EPSG:3067')
+    debug_timing("Reprojected grid CRS to EPSG:3067", start_time)
+
 grid_gdf = grid_gdf[grid_gdf.is_valid]
+print("[DEBUG] Filtering valid geometries...")
 grid_gdf = grid_gdf.to_crs(epsg=4326)
+debug_timing("Reprojected grid CRS to EPSG:4326", start_time)
 
 # Pre-calculate centroid coordinates and the center of the map
+print("[DEBUG] Calculating centroids...")
+start_time = time.time()
 latitudes = grid_gdf.geometry.centroid.y
 longitudes = grid_gdf.geometry.centroid.x
 center_lat = latitudes.mean()
 center_lon = longitudes.mean()
+debug_timing("Calculated centroids and map center", start_time)
 
 # Define the columns and short descriptions
 column_descriptions = {
@@ -66,19 +79,27 @@ column_descriptions = {
 print("[DEBUG] Loading population data...")
 start_time = time.time()
 population_df = pd.read_csv(population_csv)
-print(f"[DEBUG] Population data loaded in {time.time() - start_time:.2f} seconds")
+debug_timing("Loaded population data", start_time)
 
 # Function to query the database based on column and threshold
 def query_db(column, threshold, clicked_id):
     print("[DEBUG] Querying database...")
     start_time = time.time()
     query = f"""
-        SELECT to_id FROM full_DB 
+        SELECT to_id FROM FULL_CV 
         WHERE {column} <= ? AND from_id = ?
     """
-    related_ids = pd.read_sql(query, db_connection, params=(threshold, clicked_id))['to_id'].tolist()
-    print(f"[DEBUG] Database query completed in {time.time() - start_time:.2f} seconds")
+    # Use sqlite3 cursor for querying directly
+    cursor = db_connection.cursor()
+    cursor.execute(query, (threshold, clicked_id))
+    # Fetch all results and convert them into a list
+    related_ids = [row[0] for row in cursor.fetchall()]
+    debug_timing("Queried database", start_time)
+    cursor.execute(f"EXPLAIN QUERY PLAN {query}", (threshold, clicked_id))
+    print(cursor.fetchall())
+
     return related_ids
+
 
 # Function to calculate the total population in highlighted cells
 def calculate_population(related_ids):
@@ -89,61 +110,50 @@ def calculate_population(related_ids):
         return 0
     relevant_pop = population_df[population_df['id'].isin(related_ids)]
     total_population = relevant_pop['ASUKKAITA'].sum()
-    print(f"[DEBUG] Population calculation completed in {time.time() - start_time:.2f} seconds")
+    debug_timing("Calculated population", start_time)
     return total_population
 
 # Function to create the GeoPackage of highlighted cells
 def create_gpkg(clicked_id, related_ids, dataset_value):
+    print("[DEBUG] Creating GeoPackage...")
+    start_time = time.time()
+
     # Filter the grid GeoDataFrame to only include the related IDs
     highlighted_gdf = grid_gdf[grid_gdf['id'].isin(related_ids)]
-    print(highlighted_gdf.head())
+    debug_timing("Filtered grid for related IDs", start_time)
 
     if highlighted_gdf.empty:
-        print("Error: No matching rows found in grid_gdf for related_ids.")
-        return None  # Skip creating an empty file
-
-
-    travel_time_df = pd.read_csv(f"data/Helsinki_Travel_Time_Matrix_2023/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv")
-    print(travel_time_df.head())
-
-
-    if travel_time_df.empty:
-        print("Error: No travel time data found for clicked_id.")
+        print("[ERROR] No matching rows found in grid_gdf for related_ids.")
         return None
 
-    # Ensure columns align for the merge
-    if 'id' not in highlighted_gdf.columns:
-        print("Error: 'id' column not found in grid_gdf.")
+    # Read the corresponding travel time CSV
+    travel_time_file = f"{csv_folder}/Helsinki_Travel_Time_Matrix_2023_travel_times_to_{clicked_id}.csv"
+    if not os.path.exists(travel_time_file):
+        print(f"[ERROR] Travel time file not found: {travel_time_file}")
         return None
-    if 'from_id' not in travel_time_df.columns:
-        print("Error: 'to_id' column not found in travel_time_df.")
-        return None
+
+    travel_time_df = pd.read_csv(travel_time_file)
+    debug_timing("Loaded travel time data", start_time)
 
     # Merge the travel time data with the GeoDataFrame
     highlighted_gdf = highlighted_gdf.merge(travel_time_df, left_on='id', right_on='from_id')
-
-    if highlighted_gdf.empty:
-        print("Error: Merge resulted in an empty GeoDataFrame.")
-        return None
+    debug_timing("Merged travel time data with GeoDataFrame", start_time)
 
     # Validate geometries
     if not highlighted_gdf.is_valid.all():
-        print("Error: Invalid geometries detected. Cleaning geometries.")
+        print("[DEBUG] Cleaning invalid geometries.")
         highlighted_gdf = highlighted_gdf[highlighted_gdf.is_valid]
 
-    # Define the output file path
-    gpkg_filename = f'{download_folder}/highlighted_cells_{clicked_id}.gpkg'
-
     # Save the GeoDataFrame to a GeoPackage
+    gpkg_filename = f'{download_folder}/highlighted_cells_{clicked_id}.gpkg'
     try:
         highlighted_gdf.to_file(gpkg_filename, driver="GPKG")
-        print("this gdf is exported")
-        print(highlighted_gdf)
+        print("[DEBUG] GeoPackage successfully created.")
     except Exception as e:
-        print(f"Error saving GeoPackage: {e}")
+        print(f"[ERROR] Error saving GeoPackage: {e}")
         return None
 
-    print(f"GeoPackage successfully created: {gpkg_filename}")
+    debug_timing("Created GeoPackage", start_time)
     return gpkg_filename
 
 
