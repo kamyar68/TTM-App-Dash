@@ -49,7 +49,7 @@ column_descriptions_compare = {
 def query_db_compare(column, threshold, clicked_id):
     conn = sqlite3.connect(db_path)
     query = f"""
-        SELECT to_id FROM full_DB 
+        SELECT to_id FROM FULL_CV 
         WHERE {column} <= ? AND from_id = ?
     """
     result = pd.read_sql(query, conn, params=(threshold, clicked_id))

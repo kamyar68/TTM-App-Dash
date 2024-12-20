@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 from dash import dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 from app import app  # Make sure you import the app instance from app.py
+import dash
+from dash import dash_table  # Ensure the DataTable module is explicitly imported
 
 # Path to data files
 db_path = 'data/full_csvs.db'
@@ -128,7 +130,7 @@ def query_db(from_id, to_id):
             SELECT walk_d, walk_avg, walk_slo, bike_avg, bike_fst, bike_slo, 
                    pt_r_avg, pt_r_slo, pt_m_avg, pt_m_slo, 
                    pt_n_avg, pt_n_slo, car_r, car_m, car_n
-            FROM full_DB 
+            FROM FULL_CV 
             WHERE from_id = ? AND to_id = ?
         """
         cursor.execute(query, (from_id, to_id))
@@ -139,34 +141,39 @@ def query_db(from_id, to_id):
         if not result:
             return None
 
+        # Format time values for hours and minutes if > 60
+        def format_time(minutes):
+            if minutes > 60:
+                hours = minutes // 60
+                mins = minutes % 60
+                return f"{int(hours)} h {int(mins)} m"
+            return f"{int(minutes)} m"
+
+        # Extract distance separately
+        distance = f"{result[0] / 1000:.1f} km"
+
+        # Organize data for compact presentation
         travel_times = [
-            ("Walking (average speed):", result[1]),
-            ("Walking (slow speed):", result[2]),
-            ("Cycling (average speed):", result[3]),
-            ("Cycling (fast speed):", result[4]),
-            ("Cycling (slow speed):", result[5]),
-            ("Public transport (rush hour, average walk):", result[6]),
-            ("Public transport (rush hour, slow walk):", result[7]),
-            ("Public transport (midday, average walk):", result[8]),
-            ("Public transport (midday, slow walk):", result[9]),
-            ("Public transport (night, average walk):", result[10]),
-            ("Public transport (night, slow walk):", result[11]),
-            ("Car (rush hour):", result[12]),
-            ("Car (midday):", result[13]),
-            ("Car (night):", result[14])
+            {"Mode": "Walking", "Type/Speed": "Average speed", "Time": format_time(result[1])},
+            {"Mode": "Walking", "Type/Speed": "Slow speed", "Time": format_time(result[2])},
+            {"Mode": "Cycling", "Type/Speed": "Average speed", "Time": format_time(result[3])},
+            {"Mode": "Cycling", "Type/Speed": "Fast speed", "Time": format_time(result[4])},
+            {"Mode": "Cycling", "Type/Speed": "Slow speed", "Time": format_time(result[5])},
+            {"Mode": "Public Transport", "Type/Speed": "Rush hour (avg. walk)", "Time": format_time(result[6])},
+            {"Mode": "Public Transport", "Type/Speed": "Rush hour (slow walk)", "Time": format_time(result[7])},
+            {"Mode": "Public Transport", "Type/Speed": "Midday (avg. walk)", "Time": format_time(result[8])},
+            {"Mode": "Public Transport", "Type/Speed": "Midday (slow walk)", "Time": format_time(result[9])},
+            {"Mode": "Public Transport", "Type/Speed": "Night (avg. walk)", "Time": format_time(result[10])},
+            {"Mode": "Public Transport", "Type/Speed": "Night (slow walk)", "Time": format_time(result[11])},
+            {"Mode": "Car", "Type/Speed": "Rush hour", "Time": format_time(result[12])},
+            {"Mode": "Car", "Type/Speed": "Midday", "Time": format_time(result[13])},
+            {"Mode": "Car", "Type/Speed": "Night", "Time": format_time(result[14])}
         ]
 
-        description = [
-            html.Div([html.B("Walking distance:"), f" {int(result[0])} meters"]),
-            html.Br(),
-            html.Div(["Travel Times:"])
-        ]
-        description.extend([html.Div([label, f" {int(time)}"]) for label, time in travel_times])
-        description.append(html.Div(["All times in minutes."]))
-
-        return description
+        return distance, travel_times
     except Exception as e:
         return None
+
 
 # Callback for updating the map and selecting cells
 @app.callback(
@@ -179,10 +186,12 @@ def query_db(from_id, to_id):
 def update_map(click_data, current_output, relayout_data):
     global current_queries
 
+    # Default zoom level
     zoom = 9.5
     if relayout_data:
         zoom = relayout_data.get('mapbox.zoom', zoom)
 
+    # Handle no clicks
     if click_data is None:
         return create_map(zoom=zoom), "Click on two grid cells to query the database."
 
@@ -191,37 +200,70 @@ def update_map(click_data, current_output, relayout_data):
     except (KeyError, ValueError):
         return create_map(zoom=zoom), "Invalid click - no grid cell ID detected."
 
+    # Get previously clicked IDs from the output
     if "Clicked IDs" in current_output:
         previous_clicks = [int(id) for id in current_output.split(": ")[1].split(", ")]
     else:
         previous_clicks = []
 
+    # Add the new clicked ID
     previous_clicks.append(clicked_id)
 
+    # Reset if more than two clicks are made
     if len(previous_clicks) > 2:
         current_queries = []
         previous_clicks = [clicked_id]
 
+    # If exactly two IDs are clicked, query the database
     if len(previous_clicks) == 2:
         from_id = previous_clicks[0]
         to_id = previous_clicks[1]
 
+        # Query the database
         result = query_db(from_id, to_id)
 
         if result:
+            distance, travel_times = result
             result_message = html.Div([
-                html.Div([f"From id: {from_id}, to id: {to_id} (minutes)"]),
-                html.Hr(),
-            ] + result)
+                # Display distance
+                html.Div([html.B("Walking distance: "), distance], style={"marginBottom": "10px"}),
 
-            current_queries = [from_id, to_id]
+                # Display table for travel times
+                dash.dash_table.DataTable(
+                    data=travel_times,
+                    columns=[
+                        {"name": "Mode", "id": "Mode"},
+                        {"name": "Type/Speed", "id": "Type/Speed"},
+                        {"name": "Time", "id": "Time"}
+                    ],
+                    style_table={'overflowX': 'auto', 'minWidth': '100%'},
+                    style_cell={
+                        'textAlign': 'left',
+                        'padding': '5px',
+                        'whiteSpace': 'normal',
+                        'height': 'auto'
+                    },
+                    style_header={
+                        'backgroundColor': 'rgb(230, 230, 230)',
+                        'fontWeight': 'bold',
+                        'textAlign': 'center'
+                    }
+                )
+            ])
+
+            current_queries = [from_id, to_id]  # Update current queries
 
         else:
-            result_message = f"No data found for from_id: {from_id}, to_id: {to_id}"
+            result_message = f"No data found for From ID: {from_id}, To ID: {to_id}"
 
+        # Reset clicks
         previous_clicks = []
+
+        # Return updated map and query results
         return create_map(queried_ids=current_queries, zoom=zoom), result_message
 
+    # If only one ID is clicked, update the map with selected IDs
     output_message = f"Clicked IDs: {', '.join(map(str, previous_clicks))}"
     new_fig = create_map(selected_ids=previous_clicks, queried_ids=current_queries, zoom=zoom)
     return new_fig, output_message
+

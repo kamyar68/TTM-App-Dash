@@ -65,7 +65,7 @@ def display_page(pathname):
                     dbc.Col(
                         html.Div(
                             [
-                                html.Img(src="/assets/image1.jpg", style={"width": "100%"}),
+                                html.Img(src="/assets/images/matrix.jpg", style={"width": "100%"}),
                                 html.A("Go to Matrix Map", href="/matrix",
                                        style={"display": "block", "textAlign": "center", "marginTop": "10px"})
                             ]
@@ -75,7 +75,7 @@ def display_page(pathname):
                     dbc.Col(
                         html.Div(
                             [
-                                html.Img(src="/assets/image2.jpg", style={"width": "100%"}),
+                                html.Img(src="/assets/images/a-b.jpg", style={"width": "100%"}),
                                 html.A("Go to A-B Map", href="/AB_map",
                                        style={"display": "block", "textAlign": "center", "marginTop": "10px"})
                             ]
@@ -85,7 +85,7 @@ def display_page(pathname):
                     dbc.Col(
                         html.Div(
                             [
-                                html.Img(src="/assets/image3.jpg", style={"width": "100%"}),
+                                html.Img(src="/assets/images/compare.jpg", style={"width": "100%"}),
                                 html.A("Go to Compare Page", href="/compare",
                                        style={"display": "block", "textAlign": "center", "marginTop": "10px"})
                             ]
@@ -99,12 +99,22 @@ def display_page(pathname):
             # Static text box
             html.Div(
                 html.P(
-                    """
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
-                    Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
-                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
-                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
-                    """,
+                    [
+                        """
+            This travel time matrix records travel times and travel distances for routes between all centroids (N = 13231) of a 250 × 250 m 
+            grid over the Helsinki metropolitan area by walking, cycling, public transportation, and private car. If applicable, the routes have been 
+            calculated for different times of the day (rush hour, midday, nighttime), and assuming different physical abilities 
+            (such as walking and cycling speeds), see details below.
+            On this website you can browse this data in three different visual ways (matrix, compare, Origin-Destination mapper) and download in different formats. 
+            Read more about """,
+                        html.A(
+                            "Travel Time Matrix",
+                            href="https://www.helsinki.fi/en/researchgroups/digital-geography-lab/helsinki-region-travel-time-matrix-2023",
+                            target="_blank",
+                            style={"color": "#007bff", "textDecoration": "underline"}
+                        ),
+                        "."
+                    ],
                     style={
                         "padding": "20px",
                         "border": "1px solid #ddd",
@@ -119,7 +129,7 @@ def display_page(pathname):
 
             # Bottom image
             html.Div(
-                html.Img(src="/assets/image4.jpg", style={"width": "20%"}),
+                html.Img(src="/assets/images/footer-logo.jpg", style={"width": "30%"}),
                 style={"textAlign": "center"}
             )
         ])
