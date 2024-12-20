@@ -10,7 +10,7 @@ from pathlib import Path
 # Paths to data
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
-borders= 'data/borders.gpkg'
+borders= 'assets/vector/borders.gpkg'
 
 # Ensure the download folder exists
 download_folder = 'download_files_compare'

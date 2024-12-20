@@ -22,7 +22,7 @@ gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
 download_folder = 'download_files'  # Folder for download files
 population_csv = 'data/pop.csv'  # Population data file
-borders= 'data/borders.gpkg'
+borders= 'assets/vector/borders.gpkg'
 
 db_connection = sqlite3.connect(db_path, check_same_thread=False)
 # Ensure the download folder exists

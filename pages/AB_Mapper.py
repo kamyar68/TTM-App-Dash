@@ -10,7 +10,7 @@ from dash import dash_table  # Ensure the DataTable module is explicitly importe
 # Path to data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
-borders= 'data/borders.gpkg'
+borders= 'assets/vector/borders.gpkg'
 
 # Load the grid data
 grid_gdf = gpd.read_file(gridfile)
