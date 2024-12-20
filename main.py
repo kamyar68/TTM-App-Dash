@@ -120,7 +120,7 @@ def display_page(pathname):
                         "border": "1px solid #ddd",
                         "borderRadius": "5px",
                         "backgroundColor": "#f9f9f9",
-                        "fontSize": "16px",
+                        "fontSize": "22px",
                         "lineHeight": "1.5",
                         "marginBottom": "20px"
                     }
@@ -129,7 +129,7 @@ def display_page(pathname):
 
             # Bottom image
             html.Div(
-                html.Img(src="/assets/images/footer-logo.jpg", style={"width": "30%"}),
+                html.Img(src="/assets/images/footer-logo.jpg", style={"width": "35%"}),
                 style={"textAlign": "center"}
             )
         ])

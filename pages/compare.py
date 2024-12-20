@@ -10,6 +10,7 @@ from pathlib import Path
 # Paths to data
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
+borders= 'data/borders.gpkg'
 
 # Ensure the download folder exists
 download_folder = 'download_files_compare'
@@ -26,6 +27,17 @@ latitudes_compare = grid_gdf_compare.geometry.centroid.y
 longitudes_compare = grid_gdf_compare.geometry.centroid.x
 center_lat_compare = latitudes_compare.mean()
 center_lon_compare = longitudes_compare.mean()
+
+
+# add muncipality borders
+borders_gdf = gpd.read_file('data/borders.gpkg')
+
+print(borders_gdf.head())
+
+# Ensure the CRS is EPSG:4326 (WGS84) for Mapbox compatibility
+if borders_gdf.crs is None or borders_gdf.crs != 'EPSG:4326':
+    print("[DEBUG] Reprojecting borders CRS to EPSG:4326...")
+    borders_gdf = borders_gdf.to_crs(epsg=4326)
 
 # Extended column descriptions for travel modes
 column_descriptions_compare = {
@@ -106,7 +118,38 @@ def create_map_compare(selected_ids_dict={}, activated_id=None, zoom=9.5, center
                 name='Activated Cell'
             )
         )
-
+    # Add city borders as a new trace
+    for _, row in borders_gdf.iterrows():
+        geometry = row.geometry
+        if geometry.geom_type == 'Polygon':
+            coords = list(geometry.exterior.coords)
+            lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+            fig.add_trace(
+                go.Scattermapbox(
+                    lat=lats,
+                    lon=lons,
+                    mode='lines',
+                    line=dict(width=2, color='black'),
+                    hoverinfo='none',
+                    name='',
+                    showlegend=False
+                )
+            )
+        elif geometry.geom_type == 'MultiPolygon':
+            for polygon in geometry.geoms:
+                coords = list(polygon.exterior.coords)
+                lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+                fig.add_trace(
+                    go.Scattermapbox(
+                        lat=lats,
+                        lon=lons,
+                        mode='lines',
+                        line=dict(width=2, color='black'),
+                        hoverinfo='none',
+                        name='',
+                        showlegend=False
+                    )
+                )
     # Configure the layout with updated legend
     fig.update_layout(
         mapbox=dict(

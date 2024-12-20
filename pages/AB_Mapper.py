@@ -10,6 +10,7 @@ from dash import dash_table  # Ensure the DataTable module is explicitly importe
 # Path to data files
 db_path = 'data/full_csvs.db'
 gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
+borders= 'data/borders.gpkg'
 
 # Load the grid data
 grid_gdf = gpd.read_file(gridfile)
@@ -28,6 +29,16 @@ longitudes = grid_gdf.geometry.centroid.x
 
 # Global variable to store the current queried pair (reset after third click)
 current_queries = []
+
+# add muncipality borders
+borders_gdf = gpd.read_file('data/borders.gpkg')
+
+print(borders_gdf.head())
+
+# Ensure the CRS is EPSG:4326 (WGS84) for Mapbox compatibility
+if borders_gdf.crs is None or borders_gdf.crs != 'EPSG:4326':
+    print("[DEBUG] Reprojecting borders CRS to EPSG:4326...")
+    borders_gdf = borders_gdf.to_crs(epsg=4326)
 
 # Create the base map figure with an option to highlight selected and queried grid cells
 def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
@@ -74,7 +85,36 @@ def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
                 name='Queried Pairs'
             )
         )
-
+    # Add city borders as a new trace
+    for _, row in borders_gdf.iterrows():
+        geometry = row.geometry
+        if geometry.geom_type == 'Polygon':
+            coords = list(geometry.exterior.coords)
+            lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+            fig.add_trace(
+                go.Scattermapbox(
+                    lat=lats,
+                    lon=lons,
+                    mode='lines',
+                    line=dict(width=2, color='black'),
+                    hoverinfo='none',
+                    name='City Borders'
+                )
+            )
+        elif geometry.geom_type == 'MultiPolygon':
+            for polygon in geometry.geoms:
+                coords = list(polygon.exterior.coords)
+                lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+                fig.add_trace(
+                    go.Scattermapbox(
+                        lat=lats,
+                        lon=lons,
+                        mode='lines',
+                        line=dict(width=2, color='black'),
+                        hoverinfo='none',
+                        name='City Borders'
+                    )
+                )
     fig.update_layout(
         mapbox=dict(
             style="open-street-map",

@@ -22,6 +22,7 @@ gridfile = 'data/Helsinki_Travel_Time_Matrix_2023_grid.gpkg'
 csv_folder = 'data/Helsinki_Travel_Time_Matrix_2023'
 download_folder = 'download_files'  # Folder for download files
 population_csv = 'data/pop.csv'  # Population data file
+borders= 'data/borders.gpkg'
 
 db_connection = sqlite3.connect(db_path, check_same_thread=False)
 # Ensure the download folder exists
@@ -56,6 +57,17 @@ longitudes = grid_gdf.geometry.centroid.x
 center_lat = latitudes.mean()
 center_lon = longitudes.mean()
 debug_timing("Calculated centroids and map center", start_time)
+
+# add muncipality borders
+borders_gdf = gpd.read_file('data/borders.gpkg')
+
+print(borders_gdf.head())
+
+# Ensure the CRS is EPSG:4326 (WGS84) for Mapbox compatibility
+if borders_gdf.crs is None or borders_gdf.crs != 'EPSG:4326':
+    print("[DEBUG] Reprojecting borders CRS to EPSG:4326...")
+    borders_gdf = borders_gdf.to_crs(epsg=4326)
+
 
 # Define the columns and short descriptions
 column_descriptions = {
@@ -218,6 +230,37 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
             )
         )
 
+    # Add city borders as a new trace
+    for _, row in borders_gdf.iterrows():
+        geometry = row.geometry
+        if geometry.geom_type == 'Polygon':
+            coords = list(geometry.exterior.coords)
+            lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+            fig.add_trace(
+                go.Scattermapbox(
+                    lat=lats,
+                    lon=lons,
+                    mode='lines',
+                    line=dict(width=2, color='black'),
+                    hoverinfo='none',
+                    name='City Borders'
+                )
+            )
+        elif geometry.geom_type == 'MultiPolygon':
+            for polygon in geometry.geoms:
+                coords = list(polygon.exterior.coords)
+                lons, lats = zip(*coords)  # Correct order: longitude (x), latitude (y)
+                fig.add_trace(
+                    go.Scattermapbox(
+                        lat=lats,
+                        lon=lons,
+                        mode='lines',
+                        line=dict(width=2, color='black'),
+                        hoverinfo='none',
+                        name='City Borders'
+                    )
+                )
+
     if center is None:
         center = dict(lat=center_lat, lon=center_lon)
 
@@ -232,6 +275,8 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
     )
 
     return fig
+
+
 
 # Define layout for this page with a vertical box on the left and map on the right
 scatterplot_layout = html.Div([
