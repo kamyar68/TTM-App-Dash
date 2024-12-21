@@ -31,7 +31,7 @@ longitudes = grid_gdf.geometry.centroid.x
 current_queries = []
 
 # add muncipality borders
-borders_gdf = gpd.read_file('data/borders.gpkg')
+borders_gdf = gpd.read_file(borders)
 
 print(borders_gdf.head())
 
