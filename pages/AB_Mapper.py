@@ -50,7 +50,7 @@ def create_map(selected_ids=[], queried_ids=[], zoom=9.5):
             lat=latitudes,
             lon=longitudes,
             mode='markers',
-            marker=dict(size=13, color='blue', opacity=0.3),
+            marker=dict(size=13, color='blue', opacity=0.1),
             hoverinfo='text',
             hovertext=grid_gdf['id'].astype(str),
             name='All Grid Cells'

@@ -13,8 +13,8 @@ app.index_string = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>MHelsinki Travel Time Matrix</title>
-    <link rel="icon" href="/assets/images/ttm-logo.png" type="image/x-icon">
+    <title>Helsinki Travel Time Matrix</title>
+    <link rel="icon" href="/assets/images/ttm-logo-2.png" type="image/x-icon">
     {%metas%}
     {%css%}
 </head>

@@ -78,7 +78,7 @@ def create_map_compare(selected_ids_dict={}, activated_id=None, zoom=9.5, center
             lat=latitudes_compare,
             lon=longitudes_compare,
             mode='markers',
-            marker=dict(size=10, color='blue', opacity=0.3),
+            marker=dict(size=13, color='blue', opacity=0.1),
             hoverinfo='text',
             hovertext=grid_gdf_compare['id'].astype(str),
             name='All Grid Cells'
@@ -112,7 +112,7 @@ def create_map_compare(selected_ids_dict={}, activated_id=None, zoom=9.5, center
                 lat=activated_gdf.geometry.centroid.y,
                 lon=activated_gdf.geometry.centroid.x,
                 mode='markers',
-                marker=dict(size=15, color='black', opacity=0.9),
+                marker=dict(size=15, color='black', opacity=0.8),
                 hoverinfo='text',
                 hovertext=f"Activated Cell - ID: {activated_id}",
                 name='Activated Cell'
