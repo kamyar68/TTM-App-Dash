@@ -129,7 +129,7 @@ def create_map_compare(selected_ids_dict={}, activated_id=None, zoom=9.5, center
                     lat=lats,
                     lon=lons,
                     mode='lines',
-                    line=dict(width=2, color='black'),
+                    line=dict(width=1, color='black'),
                     hoverinfo='none',
                     name='',
                     showlegend=False
@@ -144,7 +144,7 @@ def create_map_compare(selected_ids_dict={}, activated_id=None, zoom=9.5, center
                         lat=lats,
                         lon=lons,
                         mode='lines',
-                        line=dict(width=2, color='black'),
+                        line=dict(width=1, color='black'),
                         hoverinfo='none',
                         name='',
                         showlegend=False

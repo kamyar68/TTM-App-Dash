@@ -241,7 +241,7 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
                     lat=lats,
                     lon=lons,
                     mode='lines',
-                    line=dict(width=2, color='black'),
+                    line=dict(width=1, color='black'),
                     hoverinfo='none',
                     name='City Borders'
                 )
@@ -255,7 +255,7 @@ def create_map(selected_ids=[], activated_id=None, zoom=9.5, center=None):
                         lat=lats,
                         lon=lons,
                         mode='lines',
-                        line=dict(width=2, color='black'),
+                        line=dict(width=1, color='black'),
                         hoverinfo='none',
                         name='City Borders'
                     )
