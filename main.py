@@ -8,6 +8,26 @@ from pages.Matrix import scatterplot_layout, download_folder, csv_folder
 from pages.AB_Mapper import toast_map_layout
 from pages.compare import compare_layout  # Import the new compare page layout
 
+app.index_string = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MHelsinki Travel Time Matrix</title>
+    <link rel="icon" href="/assets/images/ttm-logo.png" type="image/x-icon">
+    {%metas%}
+    {%css%}
+</head>
+<body>
+    {%app_entry%}
+    <footer>
+        {%config%}
+        {%scripts%}
+        {%renderer%}
+    </footer>
+</body>
+</html>
+"""
 
 
 # Serve files from the 'download_folder'
