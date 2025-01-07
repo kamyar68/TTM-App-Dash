@@ -75,7 +75,7 @@ def display_page(pathname):
         return html.Div([
             # Heading
             html.Div(
-                html.H1("Welcome to the Dashboard", style={"textAlign": "center", "marginBottom": "20px"}),
+                html.H1("Helsinki Travel Time Matrix", style={"textAlign": "center", "marginBottom": "20px"}),
                 style={"padding": "20px"}
             ),
 
